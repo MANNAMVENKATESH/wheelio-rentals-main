@@ -13,6 +13,7 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [resetToken, setResetToken] = useState('');
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +21,8 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      await authAPI.forgotPassword(email);
+      const response = await authAPI.forgotPassword(email);
+      setResetToken(response.resetToken);
       setIsSubmitted(true);
       toast({
         title: 'Reset link sent',
@@ -55,14 +57,26 @@ export default function ForgotPassword() {
               </div>
               <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
               <CardDescription>
-                We've sent password reset instructions to {email}
+                Reset token generated successfully for {email}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-6">
-                Didn't receive the email? Check your spam folder or try again.
+              <p className="text-sm text-muted-foreground mb-4">
+                In a production environment, this would be sent via email.
+                For testing purposes, you can use the reset link below.
               </p>
-              <Button onClick={() => setIsSubmitted(false)} className="w-full">
+              {resetToken && (
+                <div className="mb-4 p-3 bg-muted rounded-md">
+                  <p className="text-xs text-muted-foreground mb-2">Reset Token (for testing):</p>
+                  <p className="text-sm font-mono break-all">{resetToken}</p>
+                </div>
+              )}
+              <Link to={`/reset-password?token=${resetToken}`}>
+                <Button className="w-full mb-2">
+                  Reset Password
+                </Button>
+              </Link>
+              <Button onClick={() => setIsSubmitted(false)} variant="outline" className="w-full">
                 Try Again
               </Button>
               <div className="mt-4">

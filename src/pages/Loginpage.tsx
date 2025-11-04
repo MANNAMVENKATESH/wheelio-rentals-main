@@ -22,11 +22,11 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await authAPI.login(username, password);
-      
-      // Store auth token and user data
-      localStorage.setItem('authToken', response.token);
-      localStorage.setItem('userData', JSON.stringify(response.user));
+      const user = await authAPI.login(username, password);
+      // For this backend, we get a User object back (no JWT). Store minimal info.
+      localStorage.setItem('userData', JSON.stringify(user));
+      // Proactively notify other components in this tab (storage event won't fire in same tab)
+      try { window.dispatchEvent(new Event('userDataChanged')); } catch {}
 
       toast({
         title: 'Login successful',
@@ -34,7 +34,7 @@ export default function Login() {
       });
 
       // Redirect based on user role
-      if (response.user.role === 'admin') {
+      if (user.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/');

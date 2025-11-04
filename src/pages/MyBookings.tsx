@@ -7,11 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Booking } from '@/types';
+import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function MyBookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -35,26 +38,42 @@ export default function MyBookings() {
 
   const handleCancelBooking = async (bookingId: string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/bookings/${bookingId}/cancel`, {
-        method: 'PUT',
-      });
-      if (!response.ok) throw new Error('Failed to cancel booking');
-
-      setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, status: 'cancelled' } : b))
-      );
-    } catch (error) {
-      console.error(error);
+      const all = JSON.parse(localStorage.getItem('myBookings') || '[]');
+      const updated = (all as any[]).map((b) => (b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+      localStorage.setItem('myBookings', JSON.stringify(updated));
+      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'cancelled' } : b)));
+      toast({ title: 'Booking cancelled', description: `Booking ${bookingId} has been cancelled.` });
+    } catch (e) {
+      toast({ title: 'Cancel failed', description: 'Could not cancel booking', variant: 'destructive' });
     }
   };
 
   useEffect(() => {
     async function fetchBookings() {
       try {
-        const res = await fetch('http://localhost:8080/api/bookings'); // Replace with actual backend endpoint
-        if (!res.ok) throw new Error('Failed to fetch bookings');
-        const data = await res.json();
-        setBookings(data);
+        const currentUser = JSON.parse(localStorage.getItem('userData') || 'null');
+        const username = currentUser?.username || currentUser?.email || 'guest';
+        // Combine locally stored detailed bookings with backend payments as fallback
+        const local = JSON.parse(localStorage.getItem('myBookings') || '[]') as any[];
+        const localMine = local.filter((b) => (b.userId || '').toLowerCase() === String(username).toLowerCase());
+
+        const payments = await apiRequest('/payments');
+        const paymentMine = (payments || []).filter((p: any) => (p.username || '').toLowerCase() === String(username).toLowerCase());
+        const paymentAsBookings: Booking[] = paymentMine.map((p: any, idx: number) => ({
+          id: String(p.id ?? `p${idx}`),
+          carId: '',
+          car: { id: '', brand: 'N/A', model: 'N/A', type: 'Sedan', pricePerDay: 0, image: '', availability: true, description: '', features: [], year: new Date().getFullYear(), fuel: '', transmission: '', seats: 4, location: '' },
+          userId: username,
+          startDate: new Date().toISOString(),
+          endDate: new Date().toISOString(),
+          totalCost: Number(p.amount ?? 0),
+          status: 'confirmed',
+          userDetails: { name: '', email: username, phone: '' },
+          createdAt: p.date || new Date().toISOString(),
+        }));
+
+        // Prefer local detailed bookings at the top
+        setBookings([...(localMine as any), ...paymentAsBookings]);
       } catch (error) {
         console.error(error);
       } finally {
@@ -110,8 +129,75 @@ export default function MyBookings() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
               >
-                {/* Your existing Card rendering logic here */}
-                {/* Make sure to use booking.totalCost, booking.status, etc. */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="flex items-center space-x-2">
+                      <Car className="h-5 w-5" />
+                      <span>
+                        {(booking.car?.brand || 'Car')} {(booking.car?.model || '')}
+                      </span>
+                    </CardTitle>
+                    <Badge className={cn('capitalize', getStatusColor(booking.status))}>{booking.status}</Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                      <div className="md:col-span-1">
+                        {booking.car?.image ? (
+                          <img src={booking.car.image} alt="car" className="w-full h-24 object-cover rounded" />
+                        ) : (
+                          <div className="w-full h-24 rounded bg-muted flex items-center justify-center text-muted-foreground">No image</div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>Pickup: {format(new Date(booking.startDate), 'MMM dd, yyyy')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>Return: {format(new Date(booking.endDate), 'MMM dd, yyyy')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            {Math.max(1, Math.ceil((new Date(booking.endDate).getTime() - new Date(booking.startDate).getTime()) / (1000 * 60 * 60 * 24)))} day(s)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="md:col-span-1 text-right">
+                        <div className="text-sm text-muted-foreground">Total</div>
+                        <div className="text-xl font-bold">${booking.totalCost}</div>
+                      </div>
+                      <div className="md:col-span-1 flex justify-end space-x-2">
+                        {canCancelBooking(booking) && (
+                          <Button variant="outline" onClick={() => handleCancelBooking(booking.id)}>
+                            Cancel
+                          </Button>
+                        )}
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="secondary">
+                              <Eye className="h-4 w-4 mr-2" /> Details
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Booking Details</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-2 text-sm">
+                              <div>Booking ID: {booking.id}</div>
+                              <div>Car: {(booking.car?.brand || 'Car')} {(booking.car?.model || '')}</div>
+                              <div>Start: {format(new Date(booking.startDate), 'PPpp')}</div>
+                              <div>End: {format(new Date(booking.endDate), 'PPpp')}</div>
+                              <div>Total: ${booking.totalCost}</div>
+                              <div>Status: {booking.status}</div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>

@@ -10,19 +10,34 @@ import { useToast } from '@/hooks/use-toast';
 import { authAPI } from '@/lib/api';
 
 export default function Register() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
+    mobileNumber: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'USA'
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (password !== confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       toast({
         title: 'Password mismatch',
         description: 'Passwords do not match',
@@ -31,7 +46,7 @@ export default function Register() {
       return;
     }
 
-    if (password.length < 6) {
+    if (formData.password.length < 6) {
       toast({
         title: 'Password too short',
         description: 'Password must be at least 6 characters long',
@@ -40,10 +55,20 @@ export default function Register() {
       return;
     }
 
+    // Validate required fields
+    if (!formData.firstName || !formData.lastName || !formData.mobileNumber) {
+      toast({
+        title: 'Missing required fields',
+        description: 'Please fill in all required information',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const response = await authAPI.register(email, password);
+      const response = await authAPI.register(formData);
       
       toast({
         title: 'Registration successful',
@@ -68,9 +93,9 @@ export default function Register() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        className="w-full max-w-2xl"
       >
-        <Card>
+        <Card className="w-full max-w-2xl">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
@@ -81,72 +106,205 @@ export default function Register() {
             <CardDescription>Join Wheelio and start renting cars today</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="Enter your email"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    placeholder="Create a password"
-                    minLength={6}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Personal Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Personal Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Enter your first name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name *</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Enter your last name"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    placeholder="Confirm your password"
-                    minLength={6}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
+              {/* Contact Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Contact Information</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username *</Label>
+                    <Input
+                      id="username"
+                      name="username"
+                      type="text"
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Choose a username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mobileNumber">Mobile Number *</Label>
+                    <Input
+                      id="mobileNumber"
+                      name="mobileNumber"
+                      type="tel"
+                      value={formData.mobileNumber}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Enter your mobile number"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Address Information</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      name="address"
+                      type="text"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      placeholder="Enter your address"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        name="city"
+                        type="text"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        placeholder="City"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        name="state"
+                        type="text"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        placeholder="State"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zipCode">ZIP Code</Label>
+                      <Input
+                        id="zipCode"
+                        name="zipCode"
+                        type="text"
+                        value={formData.zipCode}
+                        onChange={handleInputChange}
+                        placeholder="ZIP Code"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Input
+                      id="country"
+                      name="country"
+                      type="text"
+                      value={formData.country}
+                      onChange={handleInputChange}
+                      placeholder="Country"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Security</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password *</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Create a password"
+                        minLength={6}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={formData.confirmPassword}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Confirm your password"
+                        minLength={6}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
 

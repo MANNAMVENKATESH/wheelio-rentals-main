@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
 
 interface BookingData {
   car: {
@@ -34,11 +35,22 @@ export default function Booking() {
     lastName: '',
     email: '',
     phone: '',
+    mobileNumber: '',
     license: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'USA',
     cardNumber: '',
     expiryDate: '',
     cvv: '',
-    cardName: ''
+    cardName: '',
+    billingAddress: '',
+    billingCity: '',
+    billingState: '',
+    billingZipCode: '',
+    billingCountry: 'USA'
   });
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -64,21 +76,90 @@ export default function Booking() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('userData') || 'null');
+      const username = currentUser?.username || currentUser?.email || 'guest';
+
+      // Validate required fields
+      if (!formData.firstName || !formData.lastName || !formData.email || !formData.mobileNumber) {
+        toast({ 
+          title: 'Missing required fields', 
+          description: 'Please fill in all required customer information', 
+          variant: 'destructive' 
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      // Create enhanced payment record in backend with customer details
+      const paymentData = {
+        username,
+        email: formData.email,
+        mobileNumber: formData.mobileNumber,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        amount: totalCost,
+        paymentMethod: 'Credit Card',
+        paymentStatus: 'COMPLETED',
+        billingAddress: formData.billingAddress || formData.address,
+        billingCity: formData.billingCity || formData.city,
+        billingState: formData.billingState || formData.state,
+        billingZipCode: formData.billingZipCode || formData.zipCode,
+        billingCountry: formData.billingCountry || formData.country
+      };
+
+      const payment = await apiRequest('/payment', {
+        method: 'POST',
+        body: JSON.stringify(paymentData)
+      });
+
       const id = 'WH' + Math.random().toString(36).slice(2, 11).toUpperCase();
+      
+      // Persist enhanced booking locally
+      try {
+        const existing = JSON.parse(localStorage.getItem('myBookings') || '[]');
+        const newBooking = {
+          id,
+          carId: '',
+          car,
+          userId: username,
+          startDate,
+          endDate,
+          totalCost,
+          status: 'confirmed',
+          userDetails: { 
+            name: formData.firstName + ' ' + formData.lastName, 
+            email: formData.email, 
+            phone: formData.mobileNumber,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            zipCode: formData.zipCode,
+            country: formData.country
+          },
+          paymentDetails: {
+            transactionId: payment?.transactionId,
+            paymentMethod: payment?.paymentMethod,
+            amount: payment?.amount
+          },
+          createdAt: new Date().toISOString(),
+          paymentId: payment?.id ?? null,
+        };
+        localStorage.setItem('myBookings', JSON.stringify([newBooking, ...existing]));
+      } catch {}
+      
       setBookingId(id);
       setBookingConfirmed(true);
+      toast({ title: 'Booking Confirmed!', description: `Your booking ID is ${id}` });
+    } catch (err) {
+      toast({ title: 'Booking failed', description: 'Could not save payment/booking', variant: 'destructive' });
+    } finally {
       setIsProcessing(false);
-
-      toast({
-        title: 'Booking Confirmed!',
-        description: `Your booking ID is ${id}`,
-      });
-    }, 2000);
+    }
   };
 
   if (bookingConfirmed) {
@@ -147,25 +228,91 @@ export default function Booking() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="firstName">First Name</Label>
+                        <Label htmlFor="firstName">First Name *</Label>
                         <Input id="firstName" name="firstName" value={formData.firstName} onChange={handleInputChange} required />
                       </div>
                       <div>
-                        <Label htmlFor="lastName">Last Name</Label>
+                        <Label htmlFor="lastName">Last Name *</Label>
                         <Input id="lastName" name="lastName" value={formData.lastName} onChange={handleInputChange} required />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="email">Email</Label>
+                      <Label htmlFor="email">Email *</Label>
                       <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} required />
                     </div>
                     <div>
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required />
+                      <Label htmlFor="mobileNumber">Mobile Number *</Label>
+                      <Input id="mobileNumber" name="mobileNumber" type="tel" value={formData.mobileNumber} onChange={handleInputChange} required placeholder="+1 (555) 123-4567" />
                     </div>
                     <div>
                       <Label htmlFor="license">Driver's License Number</Label>
-                      <Input id="license" name="license" value={formData.license} onChange={handleInputChange} required />
+                      <Input id="license" name="license" value={formData.license} onChange={handleInputChange} placeholder="D123456789" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Address Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <User className="h-5 w-5 mr-2" /> Address Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="address">Address</Label>
+                      <Input id="address" name="address" value={formData.address} onChange={handleInputChange} placeholder="123 Main Street" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="city">City</Label>
+                        <Input id="city" name="city" value={formData.city} onChange={handleInputChange} placeholder="New York" />
+                      </div>
+                      <div>
+                        <Label htmlFor="state">State</Label>
+                        <Input id="state" name="state" value={formData.state} onChange={handleInputChange} placeholder="NY" />
+                      </div>
+                      <div>
+                        <Label htmlFor="zipCode">ZIP Code</Label>
+                        <Input id="zipCode" name="zipCode" value={formData.zipCode} onChange={handleInputChange} placeholder="10001" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="country">Country</Label>
+                      <Input id="country" name="country" value={formData.country} onChange={handleInputChange} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Billing Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <CreditCard className="h-5 w-5 mr-2" /> Billing Address
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="billingAddress">Billing Address</Label>
+                      <Input id="billingAddress" name="billingAddress" value={formData.billingAddress} onChange={handleInputChange} placeholder="Same as above" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="billingCity">City</Label>
+                        <Input id="billingCity" name="billingCity" value={formData.billingCity} onChange={handleInputChange} />
+                      </div>
+                      <div>
+                        <Label htmlFor="billingState">State</Label>
+                        <Input id="billingState" name="billingState" value={formData.billingState} onChange={handleInputChange} />
+                      </div>
+                      <div>
+                        <Label htmlFor="billingZipCode">ZIP Code</Label>
+                        <Input id="billingZipCode" name="billingZipCode" value={formData.billingZipCode} onChange={handleInputChange} />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="billingCountry">Country</Label>
+                      <Input id="billingCountry" name="billingCountry" value={formData.billingCountry} onChange={handleInputChange} />
                     </div>
                   </CardContent>
                 </Card>

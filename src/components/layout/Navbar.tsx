@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Car, Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,37 @@ const navigation = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('userData');
+      if (stored) setUser(JSON.parse(stored));
+    } catch {}
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'userData') {
+        try { setUser(e.newValue ? JSON.parse(e.newValue) : null); } catch { setUser(null); }
+      }
+    };
+    const onLocalEvent = () => {
+      try {
+        const current = localStorage.getItem('userData');
+        setUser(current ? JSON.parse(current) : null);
+      } catch { setUser(null); }
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('userDataChanged', onLocalEvent as any);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('userData');
+    localStorage.removeItem('authToken');
+    setUser(null);
+    navigate('/');
+  };
 
   const isActive = (href: string) => location.pathname === href;
 
@@ -56,19 +87,32 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* Auth Buttons */}
+          {/* Auth/Profile */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/login">
-                <User className="h-4 w-4 mr-2" />
-                Login
-              </Link>
-            </Button>
-            <Button variant="premium" size="sm" asChild>
-              <Link to="/register">
-                Register
-              </Link>
-            </Button>
+            {user ? (
+              <>
+                <span className="text-sm text-foreground/80 flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  {user.username || user.email || 'User'}
+                </span>
+                <Button variant="secondary" size="sm" asChild>
+                  <Link to="/bookings">My Bookings</Link>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleLogout}>Logout</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/login">
+                    <User className="h-4 w-4 mr-2" />
+                    Login
+                  </Link>
+                </Button>
+                <Button variant="premium" size="sm" asChild>
+                  <Link to="/register">Register</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -108,17 +152,31 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="pt-4 pb-2 space-y-2">
-                <Button variant="ghost" className="w-full justify-start" asChild>
-                  <Link to="/login">
-                    <User className="h-4 w-4 mr-2" />
-                    Login
-                  </Link>
-                </Button>
-                <Button variant="premium" className="w-full" asChild>
-                  <Link to="/register">
-                    Register
-                  </Link>
-                </Button>
+                {user ? (
+                  <>
+                    <div className="px-3 py-2 text-sm text-foreground/80 flex items-center">
+                      <User className="h-4 w-4 mr-2" /> {user.username || user.email || 'User'}
+                    </div>
+                    <Button variant="secondary" className="w-full" asChild onClick={() => setIsOpen(false)}>
+                      <Link to="/bookings">My Bookings</Link>
+                    </Button>
+                    <Button variant="ghost" className="w-full" onClick={() => { setIsOpen(false); handleLogout(); }}>
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="ghost" className="w-full justify-start" asChild onClick={() => setIsOpen(false)}>
+                      <Link to="/login">
+                        <User className="h-4 w-4 mr-2" />
+                        Login
+                      </Link>
+                    </Button>
+                    <Button variant="premium" className="w-full" asChild onClick={() => setIsOpen(false)}>
+                      <Link to="/register">Register</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

@@ -1,7 +1,7 @@
-const API_BASE_URL = 'http://localhost:8081/api';
+const API_BASE_URL = 'http://localhost:8090/api';
 
 // API utility functions
-const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
+export const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
   const config: RequestInit = {
@@ -38,16 +38,16 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 // Auth API
 export const authAPI = {
   login: async (username: string, password: string) => {
-    return apiRequest('/auth/login', {
+    return apiRequest('/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
   },
 
-  register: async (email: string, password: string) => {
-    return apiRequest('/auth/register', {
+  register: async (userData: any) => {
+    return apiRequest('/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(userData),
     });
   },
 
